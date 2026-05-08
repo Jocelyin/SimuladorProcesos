@@ -2,7 +2,11 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 import threading
 import time
+import sys
+import os
 from collections import deque
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.scheduler import Scheduler
 from core.proceso import Proceso
