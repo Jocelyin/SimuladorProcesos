@@ -85,6 +85,7 @@ class App:
         self.auto_running = False
         self.auto_speed = 600
         self.proceso_id_contador = 0
+        self.hilo_auto = None
         
         self.setup_ui()
         self.schedule_update()
@@ -136,8 +137,8 @@ class App:
         self.auto_button = ttk.Button(toolbar, text="Auto ON", command=self.toggle_auto)
         self.auto_button.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(toolbar, text="Velocidad (ms):").pack(side=tk.LEFT, padx=5)
-        self.speed_scale = ttk.Scale(toolbar, from_=100, to=2000, orient=tk.HORIZONTAL, 
+        ttk.Label(toolbar, text="Velocidad (rápido a lento):").pack(side=tk.LEFT, padx=5)
+        self.speed_scale = ttk.Scale(toolbar, from_=2000, to=200, orient=tk.HORIZONTAL, 
                                       command=self.change_speed)
         self.speed_scale.set(600)
         self.speed_scale.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
@@ -304,8 +305,25 @@ class App:
 
     def toggle_auto(self):
         self.auto_running = not self.auto_running
-        text = "Auto OFF" if self.auto_running else "Auto ON"
-        self.auto_button.config(text=text)
+        if self.auto_running:
+            self.auto_button.config(text="Auto OFF")
+            self.hilo_auto = threading.Thread(target=self._loop_auto, daemon=True)
+            self.hilo_auto.start()
+        else:
+            self.auto_button.config(text="Auto ON")
+
+    def _loop_auto(self):
+        while self.auto_running:
+            try:
+                quantum = int(self.quantum_var.get())
+                self.scheduler.quantum = quantum
+                algo = self.algo_var.get()
+                self.scheduler.algoritmo = algo
+                self.scheduler.tick_step()
+            except Exception:
+                pass
+            
+            time.sleep(self.auto_speed / 1000.0)
 
     def change_speed(self, val):
         self.auto_speed = int(float(val))
@@ -391,18 +409,8 @@ class App:
         self.pc_label.config(text=f"Buffer: {len(buffer_items)}/{estado_pc['capacidad']}")
 
     def schedule_update(self):
-        if self.auto_running:
-            try:
-                quantum = int(self.quantum_var.get())
-                self.scheduler.quantum = quantum
-                algo = self.algo_var.get()
-                self.scheduler.algoritmo = algo
-                self.scheduler.tick_step()
-            except Exception as e:
-                pass
-        
         self.refresh_ui()
-        self.root.after(self.auto_speed, self.schedule_update)
+        self.root.after(100, self.schedule_update)
 
 
 if __name__ == "__main__":
