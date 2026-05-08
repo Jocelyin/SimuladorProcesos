@@ -64,7 +64,6 @@ class ConfigDialog:
             self.algoritmo = self.algo_var.get()
             self.quantum = int(self.quantum_var.get())
             self.dialog.destroy()
-            self.parent.deiconify()
         except ValueError:
             self.quantum_var.set("3")
     
@@ -88,6 +87,7 @@ class App:
         self.auto_speed = 600
         self.proceso_id_contador = 0
         self.hilo_auto = None
+        self.pids_cache = []
         
         self.setup_ui()
         self.schedule_update()
@@ -268,12 +268,12 @@ class App:
         
         ttk.Label(ctrl_frame, text="De PID:").pack(side=tk.LEFT, padx=5)
         self.msg_from_var = tk.StringVar(value="1")
-        self.msg_from_menu = ttk.OptionMenu(ctrl_frame, self.msg_from_var, "1")
+        self.msg_from_menu = tk.OptionMenu(ctrl_frame, self.msg_from_var, "1")
         self.msg_from_menu.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(ctrl_frame, text="A PID:").pack(side=tk.LEFT, padx=5)
         self.msg_to_var = tk.StringVar(value="1")
-        self.msg_to_menu = ttk.OptionMenu(ctrl_frame, self.msg_to_var, "1")
+        self.msg_to_menu = tk.OptionMenu(ctrl_frame, self.msg_to_var, "1")
         self.msg_to_menu.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(ctrl_frame, text="Mensaje:").pack(side=tk.LEFT, padx=5)
@@ -416,7 +416,8 @@ class App:
     def refresh_ui(self):
         pids_activos = [str(p["pid"]) for p in self.scheduler.obtener_todos()]
         
-        if pids_activos:
+        if pids_activos != self.pids_cache:
+            self.pids_cache = pids_activos
             self.msg_from_menu['menu'].delete(0, 'end')
             self.msg_to_menu['menu'].delete(0, 'end')
             for pid in pids_activos:

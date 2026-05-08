@@ -13,14 +13,15 @@ import tkinter as tk
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw()
+    root.geometry("100x50")
+    root.title("Simulador de Procesos")
     
     config = ConfigDialog(root)
     root.wait_window(config.dialog)
     
     if config.algoritmo and config.quantum:
+        root.geometry("1400x800")
         app = App(root, algoritmo=config.algoritmo, quantum=config.quantum)
-        root.deiconify()
         root.mainloop()
     else:
         root.quit()
