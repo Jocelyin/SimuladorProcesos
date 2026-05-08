@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.scheduler import Scheduler
 from core.proceso import Proceso
 from ipc.sincronizacion import ProductorConsumidor
+from ipc.mensajes import BuzonMensajes
 from ui.logger import Logger
 
 
@@ -81,6 +82,7 @@ class App:
         self.scheduler = Scheduler(algoritmo=algoritmo, quantum=quantum)
         self.pc = ProductorConsumidor(capacidad=5)
         self.logger = Logger()
+        self.buzon = BuzonMensajes()
         
         self.auto_running = False
         self.auto_speed = 600
@@ -232,7 +234,13 @@ class App:
         self.log_text.tag_config("IPC", foreground="purple")
 
     def setup_bottom_panel(self, parent):
-        buffer_frame = ttk.Frame(parent)
+        notebook = ttk.Notebook(parent)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        pc_frame = ttk.Frame(notebook)
+        notebook.add(pc_frame, text="Productor-Consumidor")
+        
+        buffer_frame = ttk.Frame(pc_frame)
         buffer_frame.pack(side=tk.LEFT, padx=10, pady=10)
         
         ttk.Label(buffer_frame, text="Buffer:").pack()
@@ -240,7 +248,7 @@ class App:
         self.buffer_canvas = tk.Canvas(buffer_frame, width=300, height=50, bg="white")
         self.buffer_canvas.pack()
         
-        control_frame = ttk.Frame(parent)
+        control_frame = ttk.Frame(pc_frame)
         control_frame.pack(side=tk.LEFT, padx=10, pady=10)
         
         ttk.Label(control_frame, text="Item:").pack(side=tk.LEFT, padx=5)
@@ -249,8 +257,41 @@ class App:
         ttk.Button(control_frame, text="Producir", command=self.producir).pack(side=tk.LEFT, padx=5)
         ttk.Button(control_frame, text="Consumir", command=self.consumir).pack(side=tk.LEFT, padx=5)
         
-        self.pc_label = ttk.Label(parent, text="", font=("Arial", 10))
+        self.pc_label = ttk.Label(pc_frame, text="", font=("Arial", 10))
         self.pc_label.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        msg_frame = ttk.Frame(notebook)
+        notebook.add(msg_frame, text="Mensajes")
+        
+        ctrl_frame = ttk.Frame(msg_frame)
+        ctrl_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(ctrl_frame, text="De PID:").pack(side=tk.LEFT, padx=5)
+        self.msg_from_var = tk.StringVar(value="1")
+        self.msg_from_menu = ttk.OptionMenu(ctrl_frame, self.msg_from_var, "1")
+        self.msg_from_menu.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(ctrl_frame, text="A PID:").pack(side=tk.LEFT, padx=5)
+        self.msg_to_var = tk.StringVar(value="1")
+        self.msg_to_menu = ttk.OptionMenu(ctrl_frame, self.msg_to_var, "1")
+        self.msg_to_menu.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(ctrl_frame, text="Mensaje:").pack(side=tk.LEFT, padx=5)
+        self.msg_text_var = tk.StringVar()
+        ttk.Entry(ctrl_frame, textvariable=self.msg_text_var, width=30).pack(side=tk.LEFT, padx=5)
+        ttk.Button(ctrl_frame, text="Enviar", command=self.enviar_mensaje).pack(side=tk.LEFT, padx=5)
+        
+        display_frame = ttk.Frame(msg_frame)
+        display_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        ttk.Label(display_frame, text="Mensajes recibidos:").pack(anchor=tk.W)
+        
+        scrollbar = ttk.Scrollbar(display_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.msg_display = scrolledtext.ScrolledText(display_frame, height=8, width=80, 
+                                                     yscrollcommand=scrollbar.set)
+        self.msg_display.pack(fill=tk.BOTH, expand=True)
 
     def crear_proceso(self):
         try:
@@ -262,6 +303,7 @@ class App:
             proceso = Proceso(nombre=nombre, prioridad=prioridad, burst_time=burst, 
                             memoria_req=memoria, tiempo_llegada=self.scheduler.tick)
             self.scheduler.agregar_proceso(proceso)
+            self.buzon.crear_buzon(proceso.pid)
             self.logger.registrar(self.scheduler.tick, "PROCESO", f"Creado {nombre} (PID {proceso.pid})")
             
             self.proceso_id_contador += 1
@@ -351,11 +393,36 @@ class App:
         
         self.refresh_ui()
 
+    def enviar_mensaje(self):
+        try:
+            from_pid = int(self.msg_from_var.get())
+            to_pid = int(self.msg_to_var.get())
+            texto = self.msg_text_var.get()
+            
+            if not texto:
+                self.logger.registrar(self.scheduler.tick, "IPC", "Mensaje vacío")
+                return
+            
+            self.buzon.enviar(from_pid, to_pid, texto)
+            self.logger.registrar(self.scheduler.tick, "IPC", f"Mensaje de {from_pid} a {to_pid}: {texto}")
+            self.msg_text_var.set("")
+        except Exception as e:
+            self.logger.registrar(self.scheduler.tick, "IPC", f"Error al enviar: {e}")
+
     def limpiar_logs(self):
         self.logger.limpiar()
         self.log_text.delete("1.0", tk.END)
 
     def refresh_ui(self):
+        pids_activos = [str(p["pid"]) for p in self.scheduler.obtener_todos()]
+        
+        if pids_activos:
+            self.msg_from_menu['menu'].delete(0, 'end')
+            self.msg_to_menu['menu'].delete(0, 'end')
+            for pid in pids_activos:
+                self.msg_from_menu['menu'].add_command(label=pid, command=tk._setit(self.msg_from_var, pid))
+                self.msg_to_menu['menu'].add_command(label=pid, command=tk._setit(self.msg_to_var, pid))
+        
         self.tree.delete(*self.tree.get_children())
         for proc_dict in self.scheduler.obtener_todos():
             self.tree.insert("", tk.END, values=(
@@ -407,6 +474,16 @@ class App:
                                               font=("Arial", 8))
         
         self.pc_label.config(text=f"Buffer: {len(buffer_items)}/{estado_pc['capacidad']}")
+        
+        self.msg_display.delete("1.0", tk.END)
+        for pid in [p["pid"] for p in self.scheduler.obtener_todos()]:
+            mensajes = self.buzon.recibir(pid)
+            if mensajes:
+                msg_header = f"\n--- Proceso {pid} ---\n"
+                self.msg_display.insert(tk.END, msg_header)
+                for msg in mensajes:
+                    linea = f"De {msg['de']}: {msg['texto']}\n"
+                    self.msg_display.insert(tk.END, linea)
 
     def schedule_update(self):
         self.refresh_ui()
