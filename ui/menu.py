@@ -14,13 +14,71 @@ from ipc.sincronizacion import ProductorConsumidor
 from ui.logger import Logger
 
 
+class ConfigDialog:
+    def __init__(self, parent):
+        self.parent = parent
+        self.algoritmo = None
+        self.quantum = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Configuración Inicial")
+        self.dialog.geometry("400x250")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        frame = ttk.Frame(self.dialog, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(frame, text="Algoritmo de Planificación:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
+        
+        self.algo_var = tk.StringVar(value="FCFS")
+        algo_menu = ttk.OptionMenu(frame, self.algo_var, "FCFS", "FCFS", "RoundRobin", "SJF",
+                                   command=self.on_algo_change)
+        algo_menu.pack(anchor=tk.W, fill=tk.X, pady=(0, 15))
+        
+        ttk.Label(frame, text="Quantum (solo para Round Robin):", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
+        
+        self.quantum_var = tk.StringVar(value="3")
+        self.quantum_entry = ttk.Entry(frame, textvariable=self.quantum_var, width=10)
+        self.quantum_entry.pack(anchor=tk.W, pady=(0, 20))
+        self.quantum_entry.config(state=tk.DISABLED)
+        
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        ttk.Button(btn_frame, text="Iniciar Simulador", command=self.on_init).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancelar", command=self.on_cancel).pack(side=tk.LEFT, padx=5)
+    
+    def on_algo_change(self, value):
+        if value == "RoundRobin":
+            self.quantum_entry.config(state=tk.NORMAL)
+        else:
+            self.quantum_entry.config(state=tk.DISABLED)
+    
+    def on_init(self):
+        try:
+            self.algoritmo = self.algo_var.get()
+            self.quantum = int(self.quantum_var.get())
+            self.dialog.destroy()
+            self.parent.deiconify()
+        except ValueError:
+            self.quantum_var.set("3")
+    
+    def on_cancel(self):
+        self.dialog.destroy()
+        self.parent.quit()
+
+
 class App:
-    def __init__(self, root):
+    def __init__(self, root, algoritmo="FCFS", quantum=3):
         self.root = root
         self.root.title("Simulador de Gestor de Procesos")
         self.root.geometry("1400x800")
         
-        self.scheduler = Scheduler(algoritmo="FCFS", quantum=3)
+        self.scheduler = Scheduler(algoritmo=algoritmo, quantum=quantum)
         self.pc = ProductorConsumidor(capacidad=5)
         self.logger = Logger()
         
