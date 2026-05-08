@@ -36,8 +36,8 @@ class ConfigDialog:
         ttk.Label(frame, text="Algoritmo de Planificación:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
         
         self.algo_var = tk.StringVar(value="FCFS")
-        algo_menu = ttk.OptionMenu(frame, self.algo_var, "FCFS", "FCFS", "RoundRobin", "SJF",
-                                   command=self.on_algo_change)
+        algo_menu = ttk.OptionMenu(frame, self.algo_var, "FCFS", "FCFS", "RoundRobin",
+                       command=self.on_algo_change)
         algo_menu.pack(anchor=tk.W, fill=tk.X, pady=(0, 15))
         
         ttk.Label(frame, text="Quantum (solo para Round Robin):", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
@@ -127,7 +127,7 @@ class App:
         
         ttk.Label(toolbar, text="Algoritmo:").pack(side=tk.LEFT, padx=5)
         self.algo_var = tk.StringVar(value="FCFS")
-        algo_menu = ttk.OptionMenu(toolbar, self.algo_var, "FCFS", "FCFS", "RoundRobin", "SJF")
+        algo_menu = ttk.OptionMenu(toolbar, self.algo_var, "FCFS", "FCFS", "RoundRobin")
         algo_menu.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(toolbar, text="Quantum:").pack(side=tk.LEFT, padx=5)

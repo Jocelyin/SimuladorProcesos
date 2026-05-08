@@ -1,6 +1,6 @@
 # Simulador de Gestor de Procesos
 
-Simulador educativo de un gestor de procesos de sistema operativo, implementado en Python con interfaz gráfica tkinter. Reproduce fielmente el comportamiento de un planificador de procesos real con algoritmos FCFS, Round Robin y SJF.
+Simulador educativo de un gestor de procesos de sistema operativo, implementado en Python con interfaz gráfica tkinter. Reproduce fielmente el comportamiento de un planificador de procesos real con algoritmos FCFS y Round Robin.
 
 ## Información Académica
 
@@ -46,8 +46,7 @@ SimuladorProcesos/
 ├── algoritmos/               # Algoritmos de planificación
 │   ├── __init__.py
 │   ├── fcfs.py              # First Come First Served
-│   ├── round_robin.py       # Round Robin con quantum
-│   └── sjf.py               # Shortest Job First
+│   └── round_robin.py       # Round Robin con quantum
 ├── ipc/                      # Comunicación entre procesos
 │   ├── __init__.py
 │   ├── sincronizacion.py    # Semáforos y Productor-Consumidor
@@ -71,7 +70,6 @@ Contiene la lógica fundamental del simulador:
 Implementa los tres algoritmos de planificación:
 - **FCFS:** Procesa en orden FIFO sin preemption.
 - **Round Robin:** Preemptivo con quantum configurable, alterna procesos equitativamente.
-- **SJF:** Selecciona siempre el proceso con menor tiempo restante (no preemptivo).
 
 ### ipc/
 Sincronización e IPC:
@@ -98,7 +96,7 @@ Interfaz y logging:
 - Visualizar estado de todos los procesos en tabla interactiva
 
 ### Algoritmos de Planificación
-- Seleccionar algoritmo dinámicamente (FCFS, Round Robin, SJF)
+- Seleccionar algoritmo dinámicamente (FCFS, Round Robin)
 - Configurar quantum para Round Robin
 - Ejecutar ticks manuales o simulación automática
 
@@ -116,7 +114,7 @@ Interfaz y logging:
 ## Uso del Simulador
 
 1. **Crear procesos:** Ingresa nombre, burst time, prioridad y memoria. Presiona "Crear".
-2. **Elegir algoritmo:** Usa el selector en la barra superior (FCFS, RoundRobin, SJF).
+2. **Elegir algoritmo:** Usa el selector en la barra superior (FCFS, RoundRobin).
 3. **Configurar quantum:** Para Round Robin, ajusta el valor y presiona Tick.
 4. **Ejecutar:** Presiona "Tick Manual" para avanzar un paso o "Auto ON" para simulación continua.
 5. **Observar:** Mira cómo los procesos cambian de estado según el algoritmo seleccionado.
