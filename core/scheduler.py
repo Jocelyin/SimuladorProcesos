@@ -18,7 +18,10 @@ class Scheduler:
 	def _registrar_log(self, mensaje: str) -> None:
 		self.log.append(f"[Tick {self.tick}] {mensaje}")
 
-	def agregar_proceso(self, proceso) -> None:
+	def agregar_proceso(self, proceso) -> bool:
+		if not self.recursos.solicitar_memoria(proceso.pid, proceso.memoria_req):
+			self._registrar_log(f"Memoria insuficiente para proceso {proceso.pid}")
+			return False
 		self.todos_los_procesos[proceso.pid] = proceso
 		if proceso.estado != "listo":
 			proceso.cambiar_estado("listo")
@@ -26,6 +29,7 @@ class Scheduler:
 			proceso.tiempo_llegada = self.tick
 		self.cola_listos.append(proceso.pid)
 		self._registrar_log(f"Proceso {proceso.pid} agregado a la cola de listos")
+		return True
 
 	def suspender(self, pid) -> None:
 		proceso = self.todos_los_procesos.get(pid)
@@ -52,6 +56,7 @@ class Scheduler:
 			return
 		proceso.cambiar_estado("terminado")
 		proceso.causa_terminacion = causa
+		self.recursos.liberar_memoria(proceso.memoria_req)
 		proceso.liberar_recursos()
 		if self.proceso_actual is not None and self.proceso_actual.pid == pid:
 			self.proceso_actual = None

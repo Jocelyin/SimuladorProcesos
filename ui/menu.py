@@ -4,7 +4,6 @@ import threading
 import time
 import sys
 import os
-from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,63 +12,6 @@ from core.proceso import Proceso
 from ipc.sincronizacion import ProductorConsumidor
 from ipc.mensajes import BuzonMensajes
 from ui.logger import Logger
-
-
-class ConfigDialog:
-    def __init__(self, parent):
-        self.parent = parent
-        self.algoritmo = None
-        self.quantum = None
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Configuración Inicial")
-        self.dialog.geometry("400x250")
-        self.dialog.resizable(False, False)
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
-        
-        self.setup_ui()
-    
-    def setup_ui(self):
-        frame = ttk.Frame(self.dialog, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(frame, text="Algoritmo de Planificación:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
-        
-        self.algo_var = tk.StringVar(value="FCFS")
-        algo_menu = ttk.OptionMenu(frame, self.algo_var, "FCFS", "FCFS", "RoundRobin",
-                       command=self.on_algo_change)
-        algo_menu.pack(anchor=tk.W, fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(frame, text="Quantum (solo para Round Robin):", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
-        
-        self.quantum_var = tk.StringVar(value="3")
-        self.quantum_entry = ttk.Entry(frame, textvariable=self.quantum_var, width=10)
-        self.quantum_entry.pack(anchor=tk.W, pady=(0, 20))
-        self.quantum_entry.config(state=tk.DISABLED)
-        
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=(20, 0))
-        
-        ttk.Button(btn_frame, text="Iniciar Simulador", command=self.on_init).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Cancelar", command=self.on_cancel).pack(side=tk.LEFT, padx=5)
-    
-    def on_algo_change(self, value):
-        if value == "RoundRobin":
-            self.quantum_entry.config(state=tk.NORMAL)
-        else:
-            self.quantum_entry.config(state=tk.DISABLED)
-    
-    def on_init(self):
-        try:
-            self.algoritmo = self.algo_var.get()
-            self.quantum = int(self.quantum_var.get())
-            self.dialog.destroy()
-        except ValueError:
-            self.quantum_var.set("3")
-    
-    def on_cancel(self):
-        self.dialog.destroy()
-        self.parent.quit()
 
 
 class App:
@@ -89,8 +31,36 @@ class App:
         self.hilo_auto = None
         self.pids_cache = []
         
+        self.setup_styles()
         self.setup_ui()
         self.schedule_update()
+
+    def setup_styles(self):
+        self.root.configure(bg="#2b2b2b")
+
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        bg_dark = "#2b2b2b"
+        bg_med = "#3c3c3c"
+        bg_light = "#4a4a4a"
+        fg = "#ffffff"
+
+        style.configure("TFrame", background=bg_med)
+        style.configure("TLabel", background=bg_med, foreground=fg)
+        style.configure("TLabelframe", background=bg_dark, foreground=fg)
+        style.configure("TLabelframe.Label", background=bg_dark, foreground=fg)
+        style.configure("TButton", background=bg_med, foreground=fg, bordercolor=bg_light)
+        style.map("TButton", background=[("active", bg_light)])
+        style.configure("TEntry", fieldbackground=bg_dark, foreground=fg)
+        style.configure("TScale", background=bg_med, troughcolor=bg_dark)
+        style.configure("TNotebook", background=bg_dark, foreground=fg)
+        style.configure("TNotebook.Tab", background=bg_med, foreground=fg)
+        style.map("TNotebook.Tab", background=[("selected", bg_dark)])
+        style.configure("Treeview", background=bg_med, foreground=fg, fieldbackground=bg_med)
+        style.configure("Treeview.Heading", background=bg_dark, foreground=fg)
+        style.map("Treeview", background=[("selected", bg_light)])
+        style.configure("TMenubutton", background=bg_med, foreground=fg)
 
     def setup_ui(self):
         self.setup_toolbar()
@@ -139,11 +109,7 @@ class App:
         self.auto_button = ttk.Button(toolbar, text="Auto ON", command=self.toggle_auto)
         self.auto_button.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(toolbar, text="Velocidad (rápido a lento):").pack(side=tk.LEFT, padx=5)
-        self.speed_scale = ttk.Scale(toolbar, from_=2000, to=200, orient=tk.HORIZONTAL, 
-                                      command=self.change_speed)
-        self.speed_scale.set(600)
-        self.speed_scale.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
 
     def setup_left_panel(self, parent):
         form_frame = ttk.LabelFrame(parent, text="Crear Proceso")
@@ -205,7 +171,7 @@ class App:
         mem_frame = ttk.LabelFrame(parent, text="Memoria")
         mem_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.mem_canvas = tk.Canvas(mem_frame, height=30, bg="white")
+        self.mem_canvas = tk.Canvas(mem_frame, height=30, bg="#3c3c3c")
         self.mem_canvas.pack(fill=tk.X, padx=5, pady=5)
         
         queue_frame = ttk.LabelFrame(parent, text="Cola de Listos")
@@ -214,7 +180,8 @@ class App:
         scrollbar = ttk.Scrollbar(queue_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.queue_text = tk.Text(queue_frame, height=15, width=30, yscrollcommand=scrollbar.set)
+        self.queue_text = tk.Text(queue_frame, height=15, width=30, yscrollcommand=scrollbar.set,
+                                   bg="#3c3c3c", fg="#ffffff", insertbackground="#ffffff")
         self.queue_text.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.queue_text.yview)
 
@@ -225,13 +192,14 @@ class App:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.log_text = scrolledtext.ScrolledText(parent, height=30, width=40, 
-                                                   yscrollcommand=scrollbar.set, wrap=tk.WORD)
+                                                   yscrollcommand=scrollbar.set, wrap=tk.WORD,
+                                                   bg="#3c3c3c", fg="#ffffff", insertbackground="#ffffff")
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.log_text.tag_config("PROCESO", foreground="blue")
-        self.log_text.tag_config("RECURSO", foreground="orange")
-        self.log_text.tag_config("ALGORITMO", foreground="green")
-        self.log_text.tag_config("IPC", foreground="purple")
+        self.log_text.tag_config("PROCESO", foreground="#4FC3F7")
+        self.log_text.tag_config("RECURSO", foreground="#FFB74D")
+        self.log_text.tag_config("ALGORITMO", foreground="#81C784")
+        self.log_text.tag_config("IPC", foreground="#CE93D8")
 
     def setup_bottom_panel(self, parent):
         notebook = ttk.Notebook(parent)
@@ -245,7 +213,7 @@ class App:
         
         ttk.Label(buffer_frame, text="Buffer:").pack()
         
-        self.buffer_canvas = tk.Canvas(buffer_frame, width=300, height=50, bg="white")
+        self.buffer_canvas = tk.Canvas(buffer_frame, width=300, height=50, bg="#3c3c3c")
         self.buffer_canvas.pack()
         
         control_frame = ttk.Frame(pc_frame)
@@ -290,7 +258,8 @@ class App:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.msg_display = scrolledtext.ScrolledText(display_frame, height=8, width=80, 
-                                                     yscrollcommand=scrollbar.set)
+                                                     yscrollcommand=scrollbar.set,
+                                                     bg="#3c3c3c", fg="#ffffff", insertbackground="#ffffff")
         self.msg_display.pack(fill=tk.BOTH, expand=True)
 
     def crear_proceso(self):
@@ -302,12 +271,13 @@ class App:
             
             proceso = Proceso(nombre=nombre, prioridad=prioridad, burst_time=burst, 
                             memoria_req=memoria, tiempo_llegada=self.scheduler.tick)
-            self.scheduler.agregar_proceso(proceso)
-            self.buzon.crear_buzon(proceso.pid)
-            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Creado {nombre} (PID {proceso.pid})")
-            
-            self.proceso_id_contador += 1
-            self.nombre_var.set("")
+            if self.scheduler.agregar_proceso(proceso):
+                self.buzon.crear_buzon(proceso.pid)
+                self.logger.registrar(self.scheduler.tick, "PROCESO", f"Creado {nombre} (PID {proceso.pid})")
+                self.proceso_id_contador += 1
+                self.nombre_var.set("")
+            else:
+                self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error: memoria insuficiente para {nombre}")
         except Exception as e:
             self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error: {e}")
 
@@ -366,9 +336,6 @@ class App:
                 pass
             
             time.sleep(self.auto_speed / 1000.0)
-
-    def change_speed(self, val):
-        self.auto_speed = int(float(val))
 
     def producir(self):
         try:
@@ -449,7 +416,7 @@ class App:
             ratio = mem_usado / mem_total if mem_total > 0 else 0
             self.mem_canvas.create_rectangle(0, 0, ancho * ratio, 30, fill="blue")
             self.mem_canvas.create_text(ancho // 2, 15, text=f"{mem_usado}/{mem_total} MB", 
-                                       fill="black", font=("Arial", 9))
+                                       fill="white", font=("Arial", 9))
         
         self.queue_text.delete("1.0", tk.END)
         queue_info = f"Procesos en cola: {len(self.scheduler.cola_listos)}\n"
@@ -490,8 +457,3 @@ class App:
         self.refresh_ui()
         self.root.after(100, self.schedule_update)
 
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
