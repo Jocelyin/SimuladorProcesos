@@ -9,7 +9,6 @@ class Proceso:
 	def __init__(
 		self,
 		nombre: str,
-		prioridad: int,
 		burst_time: int,
 		memoria_req: int,
 		tiempo_llegada: int = 0,
@@ -19,7 +18,6 @@ class Proceso:
 
 		self.nombre = nombre
 		self.estado = "listo"
-		self.prioridad = prioridad
 		self.burst_time = burst_time
 		self.tiempo_restante = burst_time
 		self.memoria_req = memoria_req
@@ -48,7 +46,6 @@ class Proceso:
 			"pid": self.pid,
 			"nombre": self.nombre,
 			"estado": self.estado,
-			"prioridad": self.prioridad,
 			"burst_time": self.burst_time,
 			"tiempo_restante": self.tiempo_restante,
 			"memoria_req": self.memoria_req,

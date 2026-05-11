@@ -4,7 +4,6 @@ import threading
 import time
 import sys
 import os
-from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,63 +12,6 @@ from core.proceso import Proceso
 from ipc.sincronizacion import ProductorConsumidor
 from ipc.mensajes import BuzonMensajes
 from ui.logger import Logger
-
-
-class ConfigDialog:
-    def __init__(self, parent):
-        self.parent = parent
-        self.algoritmo = None
-        self.quantum = None
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Configuración Inicial")
-        self.dialog.geometry("400x250")
-        self.dialog.resizable(False, False)
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
-        
-        self.setup_ui()
-    
-    def setup_ui(self):
-        frame = ttk.Frame(self.dialog, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(frame, text="Algoritmo de Planificación:", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
-        
-        self.algo_var = tk.StringVar(value="FCFS")
-        algo_menu = ttk.OptionMenu(frame, self.algo_var, "FCFS", "FCFS", "RoundRobin",
-                       command=self.on_algo_change)
-        algo_menu.pack(anchor=tk.W, fill=tk.X, pady=(0, 15))
-        
-        ttk.Label(frame, text="Quantum (solo para Round Robin):", font=("Arial", 10)).pack(anchor=tk.W, pady=(0, 5))
-        
-        self.quantum_var = tk.StringVar(value="3")
-        self.quantum_entry = ttk.Entry(frame, textvariable=self.quantum_var, width=10)
-        self.quantum_entry.pack(anchor=tk.W, pady=(0, 20))
-        self.quantum_entry.config(state=tk.DISABLED)
-        
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack(fill=tk.X, pady=(20, 0))
-        
-        ttk.Button(btn_frame, text="Iniciar Simulador", command=self.on_init).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Cancelar", command=self.on_cancel).pack(side=tk.LEFT, padx=5)
-    
-    def on_algo_change(self, value):
-        if value == "RoundRobin":
-            self.quantum_entry.config(state=tk.NORMAL)
-        else:
-            self.quantum_entry.config(state=tk.DISABLED)
-    
-    def on_init(self):
-        try:
-            self.algoritmo = self.algo_var.get()
-            self.quantum = int(self.quantum_var.get())
-            self.dialog.destroy()
-        except ValueError:
-            self.quantum_var.set("3")
-    
-    def on_cancel(self):
-        self.dialog.destroy()
-        self.parent.quit()
 
 
 class App:
@@ -82,15 +24,48 @@ class App:
         self.pc = ProductorConsumidor(capacidad=5)
         self.logger = Logger()
         self.buzon = BuzonMensajes()
+        self.scheduler.buzon = self.buzon
+        self.scheduler.pc = self.pc
         
         self.auto_running = False
         self.auto_speed = 600
         self.proceso_id_contador = 0
         self.hilo_auto = None
-        self.pids_cache = []
+        self._ultimo_log_evento = 0
+        self._ultimo_log_scheduler = 0
         
+        self.setup_styles()
         self.setup_ui()
         self.schedule_update()
+
+    def setup_styles(self):
+        self.root.configure(bg="#2b2b2b")
+
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        bg_dark = "#2b2b2b"
+        bg_med = "#3c3c3c"
+        bg_light = "#4a4a4a"
+        fg = "#ffffff"
+
+        style.configure("TFrame", background=bg_med)
+        style.configure("TLabel", background=bg_med, foreground=fg)
+        style.configure("TLabelframe", background=bg_dark, foreground=fg)
+        style.configure("TLabelframe.Label", background=bg_dark, foreground=fg)
+        style.configure("TButton", background=bg_med, foreground=fg, bordercolor=bg_light)
+        style.map("TButton", background=[("active", bg_light)])
+        style.configure("TEntry", fieldbackground=bg_dark, foreground=fg)
+        style.configure("TScale", background=bg_med, troughcolor=bg_dark)
+        style.configure("TNotebook", background=bg_dark, foreground=fg)
+        style.configure("TNotebook.Tab", background=bg_med, foreground=fg)
+        style.map("TNotebook.Tab", background=[("selected", bg_dark)])
+        style.configure("Treeview", background=bg_med, foreground=fg, fieldbackground=bg_med)
+        style.configure("Treeview.Heading", background=bg_dark, foreground=fg)
+        style.map("Treeview",
+            background=[("selected", "#2b6cb0")],
+            foreground=[("selected", "white")])
+        style.configure("TMenubutton", background=bg_med, foreground=fg)
 
     def setup_ui(self):
         self.setup_toolbar()
@@ -120,6 +95,7 @@ class App:
         self.setup_center_panel(center_frame)
         self.setup_right_panel(right_frame)
         self.setup_bottom_panel(bottom_frame)
+        self._on_algoritmo_change()
 
     def setup_toolbar(self):
         toolbar = ttk.Frame(self.root)
@@ -127,23 +103,33 @@ class App:
         
         ttk.Label(toolbar, text="Algoritmo:").pack(side=tk.LEFT, padx=5)
         self.algo_var = tk.StringVar(value="FCFS")
+        self.algo_var.trace("w", self._on_algoritmo_change)
         algo_menu = ttk.OptionMenu(toolbar, self.algo_var, "FCFS", "FCFS", "RoundRobin")
         algo_menu.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(toolbar, text="Quantum:").pack(side=tk.LEFT, padx=5)
         self.quantum_var = tk.StringVar(value="3")
-        ttk.Entry(toolbar, textvariable=self.quantum_var, width=5).pack(side=tk.LEFT, padx=5)
+        self.entry_quantum = ttk.Entry(toolbar, textvariable=self.quantum_var, width=5)
+        self.entry_quantum.pack(side=tk.LEFT, padx=5)
         
         ttk.Button(toolbar, text="Tick Manual", command=self.manual_tick).pack(side=tk.LEFT, padx=5)
         
         self.auto_button = ttk.Button(toolbar, text="Auto ON", command=self.toggle_auto)
         self.auto_button.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(toolbar, text="Velocidad (rápido a lento):").pack(side=tk.LEFT, padx=5)
-        self.speed_scale = ttk.Scale(toolbar, from_=2000, to=200, orient=tk.HORIZONTAL, 
+        ttk.Label(toolbar, text="Velocidad (lento a rápido):").pack(side=tk.LEFT, padx=5)
+        self.speed_scale = ttk.Scale(toolbar, from_=2000, to=200, orient=tk.HORIZONTAL,
                                       command=self.change_speed)
         self.speed_scale.set(600)
         self.speed_scale.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+    def _on_algoritmo_change(self, *args):
+        if not hasattr(self, "entry_quantum"):
+            return
+        if self.algo_var.get() == "RoundRobin":
+            self.entry_quantum.config(state="normal")
+        else:
+            self.entry_quantum.config(state="disabled")
 
     def setup_left_panel(self, parent):
         form_frame = ttk.LabelFrame(parent, text="Crear Proceso")
@@ -156,10 +142,6 @@ class App:
         ttk.Label(form_frame, text="Burst:").pack(side=tk.LEFT, padx=5)
         self.burst_var = tk.StringVar(value="5")
         ttk.Entry(form_frame, textvariable=self.burst_var, width=5).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(form_frame, text="Prioridad:").pack(side=tk.LEFT, padx=5)
-        self.prioridad_var = tk.StringVar(value="5")
-        ttk.Entry(form_frame, textvariable=self.prioridad_var, width=5).pack(side=tk.LEFT, padx=5)
         
         ttk.Label(form_frame, text="Memoria:").pack(side=tk.LEFT, padx=5)
         self.memoria_var = tk.StringVar(value="512")
@@ -180,6 +162,7 @@ class App:
         self.tree.column("Estado", width=80)
         self.tree.column("Burst", width=50)
         self.tree.column("Restante", width=50)
+        self.tree.configure(selectmode="browse")
         
         for col in ("PID", "Nombre", "Estado", "Burst", "Restante"):
             self.tree.heading(col, text=col)
@@ -187,12 +170,20 @@ class App:
         self.tree.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.tree.yview)
         
+        self._last_tree_pid = None
+        self._selected_tree_pid = None
+        try:
+            self.tree.bind('<<TreeviewSelect>>', self._on_tree_select)
+            self.tree.bind('<ButtonRelease-1>', self._on_tree_click)
+        except Exception:
+            pass
+        
         btn_frame = ttk.Frame(parent)
         btn_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        ttk.Button(btn_frame, text="Suspender", command=self.suspender).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Reanudar", command=self.reanudar).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Terminar", command=self.terminar).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Suspender", command=self.suspender_proceso).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Reanudar", command=self.reanudar_proceso).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Terminar", command=self.terminar_proceso).pack(side=tk.LEFT, padx=5)
 
     def setup_center_panel(self, parent):
         state_frame = ttk.LabelFrame(parent, text="Estado CPU")
@@ -205,7 +196,7 @@ class App:
         mem_frame = ttk.LabelFrame(parent, text="Memoria")
         mem_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.mem_canvas = tk.Canvas(mem_frame, height=30, bg="white")
+        self.mem_canvas = tk.Canvas(mem_frame, height=30, bg="#3c3c3c")
         self.mem_canvas.pack(fill=tk.X, padx=5, pady=5)
         
         queue_frame = ttk.LabelFrame(parent, text="Cola de Listos")
@@ -214,7 +205,8 @@ class App:
         scrollbar = ttk.Scrollbar(queue_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.queue_text = tk.Text(queue_frame, height=15, width=30, yscrollcommand=scrollbar.set)
+        self.queue_text = tk.Text(queue_frame, height=15, width=30, yscrollcommand=scrollbar.set,
+                                   bg="#3c3c3c", fg="#ffffff", insertbackground="#ffffff")
         self.queue_text.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.queue_text.yview)
 
@@ -225,112 +217,130 @@ class App:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.log_text = scrolledtext.ScrolledText(parent, height=30, width=40, 
-                                                   yscrollcommand=scrollbar.set, wrap=tk.WORD)
+                                                   yscrollcommand=scrollbar.set, wrap=tk.WORD,
+                                                   bg="#3c3c3c", fg="#ffffff", insertbackground="#ffffff")
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        self.log_text.tag_config("PROCESO", foreground="blue")
-        self.log_text.tag_config("RECURSO", foreground="orange")
-        self.log_text.tag_config("ALGORITMO", foreground="green")
-        self.log_text.tag_config("IPC", foreground="purple")
+        self.log_text.tag_config("PROCESO", foreground="#4FC3F7")
+        self.log_text.tag_config("ALGORITMO", foreground="#81C784")
 
     def setup_bottom_panel(self, parent):
-        notebook = ttk.Notebook(parent)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        pc_frame = ttk.Frame(notebook)
-        notebook.add(pc_frame, text="Productor-Consumidor")
-        
-        buffer_frame = ttk.Frame(pc_frame)
+        buffer_frame = ttk.Frame(parent)
         buffer_frame.pack(side=tk.LEFT, padx=10, pady=10)
         
         ttk.Label(buffer_frame, text="Buffer:").pack()
         
-        self.buffer_canvas = tk.Canvas(buffer_frame, width=300, height=50, bg="white")
+        self.buffer_canvas = tk.Canvas(buffer_frame, width=300, height=50, bg="#3c3c3c")
         self.buffer_canvas.pack()
         
-        control_frame = ttk.Frame(pc_frame)
-        control_frame.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        ttk.Label(control_frame, text="Item:").pack(side=tk.LEFT, padx=5)
-        self.item_var = tk.StringVar()
-        ttk.Entry(control_frame, textvariable=self.item_var, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Producir", command=self.producir).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Consumir", command=self.consumir).pack(side=tk.LEFT, padx=5)
-        
-        self.pc_label = ttk.Label(pc_frame, text="", font=("Arial", 10))
+        self.pc_label = ttk.Label(parent, text="Ocupaci\u00f3n: 0/5", font=("Arial", 10))
         self.pc_label.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        msg_frame = ttk.Frame(notebook)
-        notebook.add(msg_frame, text="Mensajes")
-        
-        ctrl_frame = ttk.Frame(msg_frame)
-        ctrl_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        ttk.Label(ctrl_frame, text="De PID:").pack(side=tk.LEFT, padx=5)
-        self.msg_from_var = tk.StringVar(value="1")
-        self.msg_from_menu = tk.OptionMenu(ctrl_frame, self.msg_from_var, "1")
-        self.msg_from_menu.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(ctrl_frame, text="A PID:").pack(side=tk.LEFT, padx=5)
-        self.msg_to_var = tk.StringVar(value="1")
-        self.msg_to_menu = tk.OptionMenu(ctrl_frame, self.msg_to_var, "1")
-        self.msg_to_menu.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(ctrl_frame, text="Mensaje:").pack(side=tk.LEFT, padx=5)
-        self.msg_text_var = tk.StringVar()
-        ttk.Entry(ctrl_frame, textvariable=self.msg_text_var, width=30).pack(side=tk.LEFT, padx=5)
-        ttk.Button(ctrl_frame, text="Enviar", command=self.enviar_mensaje).pack(side=tk.LEFT, padx=5)
-        
-        display_frame = ttk.Frame(msg_frame)
-        display_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        ttk.Label(display_frame, text="Mensajes recibidos:").pack(anchor=tk.W)
-        
-        scrollbar = ttk.Scrollbar(display_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.msg_display = scrolledtext.ScrolledText(display_frame, height=8, width=80, 
-                                                     yscrollcommand=scrollbar.set)
-        self.msg_display.pack(fill=tk.BOTH, expand=True)
 
     def crear_proceso(self):
         try:
             nombre = self.nombre_var.get() or f"P{self.proceso_id_contador}"
             burst = int(self.burst_var.get())
-            prioridad = int(self.prioridad_var.get())
             memoria = int(self.memoria_var.get())
             
-            proceso = Proceso(nombre=nombre, prioridad=prioridad, burst_time=burst, 
+            proceso = Proceso(nombre=nombre, burst_time=burst, 
                             memoria_req=memoria, tiempo_llegada=self.scheduler.tick)
-            self.scheduler.agregar_proceso(proceso)
-            self.buzon.crear_buzon(proceso.pid)
-            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Creado {nombre} (PID {proceso.pid})")
-            
-            self.proceso_id_contador += 1
-            self.nombre_var.set("")
+            if self.scheduler.agregar_proceso(proceso):
+                self.buzon.crear_buzon(proceso.pid)
+                self.logger.registrar(self.scheduler.tick, "PROCESO", f"Creado {nombre} (PID {proceso.pid})")
+                self.proceso_id_contador += 1
+                self.nombre_var.set("")
+            else:
+                self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error: memoria insuficiente para {nombre}")
         except Exception as e:
             self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error: {e}")
 
-    def suspender(self):
-        selected = self.tree.selection()
-        if selected:
-            item = self.tree.item(selected[0])
-            pid = int(item["values"][0])
+    def _on_tree_select(self, event):
+        try:
+            sel = self.tree.selection()
+            if sel:
+                item = self.tree.item(sel[0])
+                vals = item.get("values") or []
+                if vals:
+                    try:
+                        pid = int(vals[0])
+                    except Exception:
+                        pid = vals[0]
+                    self._last_tree_pid = pid
+                    self._selected_tree_pid = pid
+        except Exception:
+            pass
+
+    def _on_tree_click(self, event):
+        try:
+            row = self.tree.identify_row(event.y)
+            if row:
+                try:
+                    self.tree.selection_set(row)
+                    self.tree.focus(row)
+                    self.tree.see(row)
+                    self.tree.focus_set()
+                except Exception:
+                    pass
+                item = self.tree.item(row)
+                vals = item.get("values") or []
+                if vals:
+                    try:
+                        pid = int(vals[0])
+                    except Exception:
+                        pid = vals[0]
+                    self._last_tree_pid = pid
+                    self._selected_tree_pid = pid
+        except Exception:
+            pass
+
+    def _obtener_pid_seleccionado(self):
+        seleccion = self.tree.selection()
+        if seleccion:
+            try:
+                item = self.tree.item(seleccion[0])
+                return int(item["values"][0])
+            except Exception:
+                pass
+        last_pid = getattr(self, '_last_tree_pid', None)
+        if last_pid is not None:
+            return int(last_pid)
+        return None
+
+    def suspender_proceso(self):
+        pid = self._obtener_pid_seleccionado()
+        if pid is None:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", "Suspender: selecciona un proceso en la tabla")
+            return
+        try:
             self.scheduler.suspender(pid)
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Suspender pedido para PID {pid}")
+        except Exception as e:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error al suspender PID {pid}: {e}")
+        self.refresh_ui()
 
-    def reanudar(self):
-        selected = self.tree.selection()
-        if selected:
-            item = self.tree.item(selected[0])
-            pid = int(item["values"][0])
+    def reanudar_proceso(self):
+        pid = self._obtener_pid_seleccionado()
+        if pid is None:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", "Reanudar: selecciona un proceso en la tabla")
+            return
+        try:
             self.scheduler.reanudar(pid)
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Reanudar pedido para PID {pid}")
+        except Exception as e:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error al reanudar PID {pid}: {e}")
+        self.refresh_ui()
 
-    def terminar(self):
-        selected = self.tree.selection()
-        if selected:
-            item = self.tree.item(selected[0])
-            pid = int(item["values"][0])
+    def terminar_proceso(self):
+        pid = self._obtener_pid_seleccionado()
+        if pid is None:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", "Terminar: selecciona un proceso en la tabla")
+            return
+        try:
             self.scheduler.terminar(pid, causa="usuario")
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Terminar pedido para PID {pid}")
+        except Exception as e:
+            self.logger.registrar(self.scheduler.tick, "PROCESO", f"Error al terminar PID {pid}: {e}")
+        self.refresh_ui()
 
     def manual_tick(self):
         try:
@@ -370,69 +380,50 @@ class App:
     def change_speed(self, val):
         self.auto_speed = int(float(val))
 
-    def producir(self):
-        try:
-            item = self.item_var.get()
-            if not item:
-                item = f"item_{len(self.pc.buffer)}"
-            
-            result = self.pc.producir(pid=1, item=item)
-            self.logger.registrar(self.scheduler.tick, "IPC", result["msg"])
-            self.item_var.set("")
-        except Exception as e:
-            self.logger.registrar(self.scheduler.tick, "IPC", f"Error: {e}")
-        
-        self.refresh_ui()
-
-    def consumir(self):
-        try:
-            result = self.pc.consumir(pid=1)
-            self.logger.registrar(self.scheduler.tick, "IPC", result["msg"])
-        except Exception as e:
-            self.logger.registrar(self.scheduler.tick, "IPC", f"Error: {e}")
-        
-        self.refresh_ui()
-
-    def enviar_mensaje(self):
-        try:
-            from_pid = int(self.msg_from_var.get())
-            to_pid = int(self.msg_to_var.get())
-            texto = self.msg_text_var.get()
-            
-            if not texto:
-                self.logger.registrar(self.scheduler.tick, "IPC", "Mensaje vacío")
-                return
-            
-            self.buzon.enviar(from_pid, to_pid, texto)
-            self.logger.registrar(self.scheduler.tick, "IPC", f"Mensaje de {from_pid} a {to_pid}: {texto}")
-            self.msg_text_var.set("")
-        except Exception as e:
-            self.logger.registrar(self.scheduler.tick, "IPC", f"Error al enviar: {e}")
-
     def limpiar_logs(self):
         self.logger.limpiar()
+        self.scheduler.log.clear()
         self.log_text.delete("1.0", tk.END)
+        self._ultimo_log_evento = 0
+        self._ultimo_log_scheduler = 0
+
+    def _registrar_mensajes_ipc_pendientes(self):
+        for proceso in self.scheduler.todos_los_procesos.values():
+            if not self.buzon.hay_mensajes(proceso.pid):
+                continue
+            mensajes = self.buzon.recibir(proceso.pid)
+            for mensaje in mensajes:
+                origen = mensaje.get("de", "?")
+                texto = mensaje.get("texto", "")
+                self.logger.registrar(
+                    self.scheduler.tick,
+                    "IPC",
+                    f"PID {proceso.pid} recibió de PID {origen}: {texto}",
+                )
 
     def refresh_ui(self):
-        pids_activos = [str(p["pid"]) for p in self.scheduler.obtener_todos()]
-        
-        if pids_activos != self.pids_cache:
-            self.pids_cache = pids_activos
-            self.msg_from_menu['menu'].delete(0, 'end')
-            self.msg_to_menu['menu'].delete(0, 'end')
-            for pid in pids_activos:
-                self.msg_from_menu['menu'].add_command(label=pid, command=tk._setit(self.msg_from_var, pid))
-                self.msg_to_menu['menu'].add_command(label=pid, command=tk._setit(self.msg_to_var, pid))
+        selected_pid = getattr(self, "_selected_tree_pid", None)
+        restored_item = None
         
         self.tree.delete(*self.tree.get_children())
         for proc_dict in self.scheduler.obtener_todos():
-            self.tree.insert("", tk.END, values=(
+            item_id = self.tree.insert("", tk.END, values=(
                 proc_dict["pid"],
                 proc_dict["nombre"],
                 proc_dict["estado"],
                 proc_dict["burst_time"],
                 proc_dict["tiempo_restante"]
             ))
+            if selected_pid is not None and proc_dict["pid"] == selected_pid:
+                restored_item = item_id
+
+        if restored_item:
+            try:
+                self.tree.selection_set(restored_item)
+                self.tree.focus(restored_item)
+                self.tree.see(restored_item)
+            except Exception:
+                pass
         
         if self.scheduler.proceso_actual:
             self.cpu_label.config(text=f"EN USO (PID {self.scheduler.proceso_actual.pid})", 
@@ -449,7 +440,7 @@ class App:
             ratio = mem_usado / mem_total if mem_total > 0 else 0
             self.mem_canvas.create_rectangle(0, 0, ancho * ratio, 30, fill="blue")
             self.mem_canvas.create_text(ancho // 2, 15, text=f"{mem_usado}/{mem_total} MB", 
-                                       fill="black", font=("Arial", 9))
+                                       fill="white", font=("Arial", 9))
         
         self.queue_text.delete("1.0", tk.END)
         queue_info = f"Procesos en cola: {len(self.scheduler.cola_listos)}\n"
@@ -458,10 +449,20 @@ class App:
             queue_info += f"  PID {pid}: {proc.nombre} (restante: {proc.tiempo_restante})\n"
         self.queue_text.insert("1.0", queue_info)
         
-        self.log_text.delete("1.0", tk.END)
-        for evt in self.logger.obtener_todos()[-20:]:
+        nuevos_logs = self.scheduler.log[self._ultimo_log_scheduler:]
+        for msg in nuevos_logs:
+            self.log_text.insert(tk.END, f"{msg}\n", "ALGORITMO")
+        self._ultimo_log_scheduler = len(self.scheduler.log)
+
+        self._registrar_mensajes_ipc_pendientes()
+
+        nuevos_eventos = self.logger.obtener_todos()[self._ultimo_log_evento:]
+        for evt in nuevos_eventos:
             linea = f"[{evt['tick']}] {evt['tipo']}: {evt['msg']}\n"
             self.log_text.insert(tk.END, linea, evt["tipo"])
+        self._ultimo_log_evento = len(self.logger.obtener_todos())
+
+        self.log_text.see(tk.END)
         
         self.buffer_canvas.delete("all")
         estado_pc = self.pc.estado()
@@ -474,24 +475,9 @@ class App:
                 self.buffer_canvas.create_text(x + 25, 25, text=buffer_items[i][:5], 
                                               font=("Arial", 8))
         
-        self.pc_label.config(text=f"Buffer: {len(buffer_items)}/{estado_pc['capacidad']}")
-        
-        self.msg_display.delete("1.0", tk.END)
-        for pid in [p["pid"] for p in self.scheduler.obtener_todos()]:
-            mensajes = self.buzon.recibir(pid)
-            if mensajes:
-                msg_header = f"\n--- Proceso {pid} ---\n"
-                self.msg_display.insert(tk.END, msg_header)
-                for msg in mensajes:
-                    linea = f"De {msg['de']}: {msg['texto']}\n"
-                    self.msg_display.insert(tk.END, linea)
+        self.pc_label.config(text=f"Ocupaci\u00f3n: {len(buffer_items)}/{estado_pc['capacidad']}")
 
     def schedule_update(self):
         self.refresh_ui()
         self.root.after(100, self.schedule_update)
 
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()

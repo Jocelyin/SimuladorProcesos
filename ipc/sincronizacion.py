@@ -56,6 +56,12 @@ class ProductorConsumidor:
         
         return {"ok": True, "item": item, "buffer": list(self.buffer), "msg": f"Consumido: {item}"}
 
+    def vaciado(self):
+        self.buffer.clear()
+        self.sem_llenos = Semaforo(0)
+        self.sem_vacios = Semaforo(self.capacidad)
+        self.mutex = Semaforo(1)
+
     def estado(self):
         return {
             "buffer": list(self.buffer),
