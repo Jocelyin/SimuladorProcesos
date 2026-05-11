@@ -62,6 +62,11 @@ class Scheduler:
 			self.proceso_actual = None
 			self.ticks_en_cpu = 0
 			self.recursos.liberar_cpu()
+		if hasattr(self, "buzon") and self.cola_listos:
+			siguiente_pid = self.cola_listos[0] if self.cola_listos else None
+			if siguiente_pid:
+				self.buzon.enviar(pid, siguiente_pid, f"CPU liberada por PID {pid}, tu turno")
+				self._registrar_log(f"IPC: PID {pid} notificó a PID {siguiente_pid}")
 		self._registrar_log(f"Proceso {pid} terminado ({causa})")
 
 	def tick_step(self) -> None:
@@ -78,6 +83,29 @@ class Scheduler:
 			rr_tick(self)
 		else:
 			raise ValueError(f"Algoritmo no soportado: {self.algoritmo}")
+
+		if hasattr(self, 'pc'):
+			if self.tick % 4 == 0:
+				pid_actual = self.proceso_actual.pid if self.proceso_actual else None
+				if pid_actual is not None:
+					estado_pc = self.pc.estado()
+					ocupacion = len(estado_pc["buffer"])
+					capacidad = estado_pc["capacidad"]
+
+					if ocupacion < capacidad // 2:
+						resultado = self.pc.producir(pid_actual, f"item-{self.tick}")
+						if resultado["ok"]:
+							self._registrar_log(
+								f"PC: PID {pid_actual} produjo item-{self.tick}")
+					else:
+						resultado = self.pc.consumir(pid_actual)
+						if resultado["ok"]:
+							self._registrar_log(
+								f"PC: PID {pid_actual} consumió {resultado['item']}")
+
+			if self.proceso_actual is None and not self.cola_listos and len(self.pc.buffer) > 0:
+				self.pc.vaciado()
+				self._registrar_log("PC: Buffer vaciado (sin procesos activos)")
 
 	def obtener_todos(self) -> list:
 		return [proceso.to_dict() for proceso in self.todos_los_procesos.values()]
