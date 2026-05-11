@@ -25,6 +25,12 @@ class Scheduler:
 		if proceso.tiempo_llegada == 0:
 			proceso.tiempo_llegada = self.tick
 		self.cola_listos.append(proceso.pid)
+		# Reservar memoria al agregar el proceso
+		try:
+			self.recursos.solicitar_memoria(proceso.pid, proceso.memoria_req)
+		except Exception:
+			# No romper la simulación si el proceso no tiene memoria_req
+			pass
 		self._registrar_log(f"Proceso {proceso.pid} agregado a la cola de listos")
 
 	def suspender(self, pid) -> None:
@@ -52,11 +58,22 @@ class Scheduler:
 			return
 		proceso.cambiar_estado("terminado")
 		proceso.causa_terminacion = causa
+		# Liberar recursos asociados al proceso
 		proceso.liberar_recursos()
+		try:
+			self.recursos.liberar_memoria(proceso.memoria_req)
+		except Exception:
+			# Ignorar si no tiene memoria_req
+			pass
 		if self.proceso_actual is not None and self.proceso_actual.pid == pid:
 			self.proceso_actual = None
 			self.ticks_en_cpu = 0
 			self.recursos.liberar_cpu()
+		if hasattr(self, "buzon") and self.cola_listos:
+			siguiente_pid = self.cola_listos[0] if self.cola_listos else None
+			if siguiente_pid:
+				self.buzon.enviar(pid, siguiente_pid, f"CPU liberada por PID {pid}, tu turno")
+				self._registrar_log(f"IPC: PID {pid} notificó a PID {siguiente_pid}")
 		self._registrar_log(f"Proceso {pid} terminado ({causa})")
 
 	def tick_step(self) -> None:
@@ -73,6 +90,24 @@ class Scheduler:
 			rr_tick(self)
 		else:
 			raise ValueError(f"Algoritmo no soportado: {self.algoritmo}")
+
+		if hasattr(self, 'pc') and self.tick % 4 == 0:
+			pid_actual = self.proceso_actual.pid if self.proceso_actual else None
+			if pid_actual is not None:
+				estado_pc = self.pc.estado_actual()
+				ocupacion = len(estado_pc["buffer"])
+				capacidad = estado_pc["capacidad"]
+
+				if ocupacion < capacidad // 2:
+					resultado = self.pc.producir(pid_actual, f"item-{self.tick}")
+					if resultado["ok"]:
+						self._registrar_log(
+							f"[Tick {self.tick}] PC: PID {pid_actual} produjo item-{self.tick}")
+				else:
+					resultado = self.pc.consumir(pid_actual)
+					if resultado["ok"]:
+						self._registrar_log(
+							f"[Tick {self.tick}] PC: PID {pid_actual} consumió {resultado['item']}")
 
 	def obtener_todos(self) -> list:
 		return [proceso.to_dict() for proceso in self.todos_los_procesos.values()]
