@@ -97,11 +97,17 @@ class Scheduler:
 						if resultado["ok"]:
 							self._registrar_log(
 								f"PC: PID {pid_actual} produjo item-{self.tick}")
+						else:
+							self._registrar_log(
+								f"PC: {resultado['msg']}")
 					else:
 						resultado = self.pc.consumir(pid_actual)
 						if resultado["ok"]:
 							self._registrar_log(
 								f"PC: PID {pid_actual} consumió {resultado['item']}")
+						else:
+							self._registrar_log(
+								f"PC: {resultado['msg']}")
 
 			if self.proceso_actual is None and not self.cola_listos and len(self.pc.buffer) > 0:
 				self.pc.vaciado()

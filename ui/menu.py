@@ -31,6 +31,7 @@ class App:
         self.auto_speed = 600
         self.proceso_id_contador = 0
         self.hilo_auto = None
+        self._ultimo_log_evento = 0
         self._ultimo_log_scheduler = 0
         
         self.setup_styles()
@@ -381,8 +382,24 @@ class App:
 
     def limpiar_logs(self):
         self.logger.limpiar()
+        self.scheduler.log.clear()
         self.log_text.delete("1.0", tk.END)
+        self._ultimo_log_evento = 0
         self._ultimo_log_scheduler = 0
+
+    def _registrar_mensajes_ipc_pendientes(self):
+        for proceso in self.scheduler.todos_los_procesos.values():
+            if not self.buzon.hay_mensajes(proceso.pid):
+                continue
+            mensajes = self.buzon.recibir(proceso.pid)
+            for mensaje in mensajes:
+                origen = mensaje.get("de", "?")
+                texto = mensaje.get("texto", "")
+                self.logger.registrar(
+                    self.scheduler.tick,
+                    "IPC",
+                    f"PID {proceso.pid} recibió de PID {origen}: {texto}",
+                )
 
     def refresh_ui(self):
         selected_pid = getattr(self, "_selected_tree_pid", None)
@@ -432,15 +449,20 @@ class App:
             queue_info += f"  PID {pid}: {proc.nombre} (restante: {proc.tiempo_restante})\n"
         self.queue_text.insert("1.0", queue_info)
         
-        self.log_text.delete("1.0", tk.END)
-        for evt in self.logger.obtener_todos()[-20:]:
-            linea = f"[{evt['tick']}] {evt['tipo']}: {evt['msg']}\n"
-            self.log_text.insert(tk.END, linea, evt["tipo"])
-        
         nuevos_logs = self.scheduler.log[self._ultimo_log_scheduler:]
         for msg in nuevos_logs:
             self.log_text.insert(tk.END, f"{msg}\n", "ALGORITMO")
         self._ultimo_log_scheduler = len(self.scheduler.log)
+
+        self._registrar_mensajes_ipc_pendientes()
+
+        nuevos_eventos = self.logger.obtener_todos()[self._ultimo_log_evento:]
+        for evt in nuevos_eventos:
+            linea = f"[{evt['tick']}] {evt['tipo']}: {evt['msg']}\n"
+            self.log_text.insert(tk.END, linea, evt["tipo"])
+        self._ultimo_log_evento = len(self.logger.obtener_todos())
+
+        self.log_text.see(tk.END)
         
         self.buffer_canvas.delete("all")
         estado_pc = self.pc.estado()
