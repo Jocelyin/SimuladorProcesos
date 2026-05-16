@@ -56,7 +56,7 @@ La documentación completa del proyecto se encuentra en la carpeta `docs/`.
 
 Archivo principal:
 ```bash
-docs/ManualTecnico.pdf
+docs/DocumentoTecnico_SGP_Python.pdf
 ```
 
 ## Estructura del Proyecto
@@ -83,7 +83,7 @@ SimuladorProcesos/
 │   └── logger.py            # Sistema de eventos y logs
 ├── test_imports.py          # Script de validación de módulos
 ├── docs/                    # Documentación técnica
-     └── ManualTecnico.pdf
+     └── DocumentoTecnico_SGP_Python.pdf
 ```
 
 ## Componentes Principales
@@ -117,7 +117,7 @@ Interfaz y logging:
 - **Logger:** Registro de eventos (PROCESO, RECURSO, ALGORITMO, IPC).
 
 ### docs/
-Documentación técnica y manuales del proyecto:
+Documentación técnica y manual del proyecto:
 - **Manual de Usuario y Técnico:** Instalación, uso y arquitectura del simulador.
 - **Diagramas:** Módulos, componentes, flujo de datos y estados de procesos (PCB).
 - **Arquitectura:** Explicación del Scheduler, IPC y gestión de recursos.
@@ -135,7 +135,7 @@ Documentación técnica y manuales del proyecto:
 - Visualizar estado de todos los procesos en tabla interactiva
 
 ### Algoritmos de Planificación
-- Seleccionar algoritmo dinámicamente (FCFS, Round Robin)
+- Seleccionar algoritmo dinámicamente (FCFS y Round Robin)
 - Configurar quantum para Round Robin
 - Ejecutar ticks manuales o simulación automática
 
