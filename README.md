@@ -2,6 +2,17 @@
 
 Simulador educativo de un gestor de procesos de sistema operativo, implementado en Python con interfaz gráfica tkinter. Reproduce fielmente el comportamiento de un planificador de procesos real con algoritmos FCFS y Round Robin.
 
+## Características
+
+- Simulación de procesos en tiempo real
+- Algoritmos FCFS y Round Robin
+- Gestión de CPU y memoria
+- Productor-Consumidor con semáforos
+- Interfaz gráfica con tkinter
+- Logs y monitoreo del sistema
+- Simulación manual y automática
+- Comunicación entre procesos (IPC)
+
 ## Información Académica
 
 **Materia:** Sistemas Operativos  
@@ -33,29 +44,46 @@ cd SimuladorProcesos
 python main.py
 ```
 
+## Documentación
+
+La documentación completa del proyecto se encuentra en la carpeta `docs/`.
+
+- Manual de Usuario y Técnico
+- Diagramas de arquitectura y componentes
+- Flujo de datos y estados de procesos
+- Explicación de algoritmos de planificación
+- IPC y sincronización
+
+Archivo principal:
+```bash
+docs/ManualTecnico.pdf
+```
+
 ## Estructura del Proyecto
 
 ```
 SimuladorProcesos/
-├── main.py                    # Punto de entrada principal
-├── core/                      # Lógica del simulador
+├── main.py                  # Punto de entrada principal
+├── core/                    # Lógica del simulador
 │   ├── __init__.py
-│   ├── proceso.py            # Clase Proceso con PID, estado, recursos
-│   ├── scheduler.py          # Orquestador central del sistema
-│   └── recursos.py           # Gestor de CPU y memoria
-├── algoritmos/               # Algoritmos de planificación
+│   ├── proceso.py           # Clase Proceso con PID, estado, recursos
+│   ├── scheduler.py         # Orquestador central del sistema
+│   └── recursos.py          # Gestor de CPU y memoria
+├── algoritmos/              # Algoritmos de planificación
 │   ├── __init__.py
 │   ├── fcfs.py              # First Come First Served
 │   └── round_robin.py       # Round Robin con quantum
-├── ipc/                      # Comunicación entre procesos
+├── ipc/                     # Comunicación entre procesos
 │   ├── __init__.py
 │   ├── sincronizacion.py    # Semáforos y Productor-Consumidor
 │   └── mensajes.py          # Buzón de mensajes
-├── ui/                       # Interfaz gráfica y logging
+├── ui/                      # Interfaz gráfica y logging
 │   ├── __init__.py
 │   ├── menu.py              # Aplicación tkinter principal
 │   └── logger.py            # Sistema de eventos y logs
-└── test_imports.py          # Script de validación de módulos
+├── test_imports.py          # Script de validación de módulos
+├── docs/                    # Documentación técnica
+     └── ManualTecnico.pdf
 ```
 
 ## Componentes Principales
@@ -67,7 +95,7 @@ Contiene la lógica fundamental del simulador:
 - **GestorRecursos:** Controla acceso a CPU (1 núcleo) y memoria (4096 MB).
 
 ### algoritmos/
-Implementa los tres algoritmos de planificación:
+Implementa los algoritmos de planificación:
 - **FCFS:** Procesa en orden FIFO sin preemption.
 - **Round Robin:** Preemptivo con quantum configurable, alterna procesos equitativamente.
 
@@ -88,10 +116,21 @@ Interfaz y logging:
   - Logs categorizados por color
 - **Logger:** Registro de eventos (PROCESO, RECURSO, ALGORITMO, IPC).
 
+### docs/
+Documentación técnica y manuales del proyecto:
+- **Manual de Usuario y Técnico:** Instalación, uso y arquitectura del simulador.
+- **Diagramas:** Módulos, componentes, flujo de datos y estados de procesos (PCB).
+- **Arquitectura:** Explicación del Scheduler, IPC y gestión de recursos.
+- **Algoritmos:** Funcionamiento de FCFS y Round Robin.
+- **IPC y sincronización:** Semáforos, productor-consumidor y buzón de mensajes.
+- **Ciclo de simulación:** Funcionamiento tick por tick y modo automático/manual.
+- **Logs y monitoreo:** Registro de eventos categorizados por tipo.
+  
+
 ## Funcionalidades
 
 ### Gestión de Procesos
-- Crear procesos con nombre, burst time, prioridad y memoria
+- Crear procesos con nombre, burst time y memoria
 - Suspender, reanudar y terminar procesos en tiempo real
 - Visualizar estado de todos los procesos en tabla interactiva
 
@@ -114,7 +153,7 @@ Interfaz y logging:
 ## Uso del Simulador
 
 1. **Crear procesos:** Ingresa nombre, burst time, prioridad y memoria. Presiona "Crear".
-2. **Elegir algoritmo:** Usa el selector en la barra superior (FCFS, RoundRobin).
+2. **Elegir algoritmo:** Usa el selector en la barra superior (FCFS, Round Robin).
 3. **Configurar quantum:** Para Round Robin, ajusta el valor y presiona Tick.
 4. **Ejecutar:** Presiona "Tick Manual" para avanzar un paso o "Auto ON" para simulación continua.
 5. **Observar:** Mira cómo los procesos cambian de estado según el algoritmo seleccionado.
